@@ -15,13 +15,11 @@ class CardCreate(SQLModel):
     price: float
     discount_price: Optional[float] = None
     category_id: int
-    user_id: Optional[int] = None
     location_lat: float
     location_long: float
     region: CardRegion
-    phone_numbers: List[str] = Field(default_factory=list)
     social_media: dict = Field(default_factory=dict)
-    is_featured: bool = False
+    phone_numbers: List[str] = Field(default_factory=list)
 
     class Config:
         arbitrary_types_allowed = True
@@ -32,12 +30,11 @@ class CardCreate(SQLModel):
                 "price": 100.0,
                 "discount_price": 80.0,
                 "category_id": 1,
-                "user_id": 1, # Example user_id
                 "location_lat": 41.2995,
                 "location_long": 69.2401,
                 "region": "Samarqand",
-                "phone_numbers": ["+998901234567"],
                 "social_media": {"instagram": "https://instagram.com/example", "telegram": "https://t.me/example"},
+                "phone_numbers": ["+998900003322", "+998888888888"],
                 "is_featured": True
             }
         }
@@ -49,27 +46,28 @@ class CardCreate(SQLModel):
         price: float = Form(...),
         discount_price: Optional[float] = Form(None),
         category_id: int = Form(...),
-        user_id: Optional[int] = Form(None),
         location_lat: float = Form(...),
         location_long: float = Form(...),
         region: CardRegion = Form(...),
-        phone_numbers: str = Form("[]"),
         social_media: str = Form("{}"),
-        is_featured: bool = Form(False)
+        phone_numbers: str = Form(""),
     ):
+        # Parse phone numbers from comma-separated string to list
+        parsed_phone_numbers = []
+        if phone_numbers and phone_numbers.strip():
+            parsed_phone_numbers = [phone.strip() for phone in phone_numbers.split(',') if phone.strip()]
+        
         return cls(
             name=name,
             description=description,
             price=price,
             discount_price=discount_price,
             category_id=category_id,
-            user_id=user_id,
             location_lat=location_lat,
             location_long=location_long,
             region=region,
-            phone_numbers=json.loads(phone_numbers),
-            social_media=json.loads(social_media),
-            is_featured=is_featured
+            social_media=json.loads(social_media or "{}"),
+            phone_numbers=parsed_phone_numbers,
         )
 
 
@@ -99,6 +97,32 @@ class CardRead(SQLModel):
         arbitrary_types_allowed = True
         from_attributes = True
 
+    @classmethod
+    def from_card(cls, card: "Card") -> "CardRead":
+        """Create CardRead from Card instance with proper property handling"""
+        return cls(
+            id=card.id,
+            name=card.name,
+            description=card.description,
+            price=card.price,
+            discount_price=card.discount_price,
+            category_id=card.category_id,
+            user_id=card.user_id,
+            image_urls=card.image_urls,
+            rating=card.rating,
+            rating_count=card.rating_count,
+            like_count=card.like_count,
+            view_count=card.view_count,
+            location_lat=card.location_lat,
+            location_long=card.location_long,
+            region=card.region,
+            phone_numbers=card.phone_numbers,
+            social_media=card.social_media,
+            is_featured=card.is_featured,
+            created_at=card.created_at,
+            updated_at=card.updated_at,
+        )
+
 
 class CardUpdate(SQLModel):
     name: Optional[str] = None
@@ -106,13 +130,11 @@ class CardUpdate(SQLModel):
     price: Optional[float] = None
     discount_price: Optional[float] = None
     category_id: Optional[int] = None
-    user_id: Optional[int] = None
     location_lat: Optional[float] = None
     location_long: Optional[float] = None
     region: Optional[CardRegion] = None
+    social_media: Optional[str] = None
     phone_numbers: Optional[List[str]] = None
-    social_media: Optional[dict] = None
-    is_featured: Optional[bool] = None
 
     class Config:
         arbitrary_types_allowed = True
@@ -124,16 +146,18 @@ class CardUpdate(SQLModel):
         price: Optional[float] = Form(None),
         discount_price: Optional[float] = Form(None),
         category_id: Optional[int] = Form(None),
-        user_id: Optional[int] = Form(None),
         location_lat: Optional[float] = Form(None),
         location_long: Optional[float] = Form(None),
         region: Optional[CardRegion] = Form(None),
-        phone_numbers: Optional[str] = Form(None),
         social_media: Optional[str] = Form(None),
-        is_featured: Optional[bool] = Form(None)
+        phone_numbers: Optional[str] = Form(None),
     ):
-        parsed_phone_numbers = json.loads(phone_numbers) if phone_numbers else None
         parsed_social_media = json.loads(social_media) if social_media else None
+        
+        # Parse phone numbers from comma-separated string to list
+        parsed_phone_numbers = None
+        if phone_numbers and phone_numbers.strip():
+            parsed_phone_numbers = [phone.strip() for phone in phone_numbers.split(',') if phone.strip()]
 
         return cls(
             name=name,
@@ -141,13 +165,11 @@ class CardUpdate(SQLModel):
             price=price,
             discount_price=discount_price,
             category_id=category_id,
-            user_id=user_id,
             location_lat=location_lat,
             location_long=location_long,
             region=region,
-            phone_numbers=parsed_phone_numbers,
             social_media=parsed_social_media,
-            is_featured=is_featured
+            phone_numbers=parsed_phone_numbers,
         )
 
 
@@ -158,4 +180,5 @@ class CardListResponse(SQLModel):
     size: int
 
     class Config:
-        arbitrary_types_allowed = True 
+        arbitrary_types_allowed = True
+        

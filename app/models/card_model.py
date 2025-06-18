@@ -18,6 +18,18 @@ class CardRegion(str, Enum):
     surkhondaryo = "Surxondaryo"
     xorazm = "Xorazm"
     karakalpakstan = "Qoraqalpogiston"
+    
+class SortField(str, Enum):
+    rating = "rating"
+    name = "name"
+    price = "price"
+    discount_price = "discount_price"
+    like_count = "like_count"
+    created_at = "created_at"
+    
+class SortOrder(str, Enum):
+    asc = "asc"
+    desc = "desc"
 
 class Card(SQLModel, table=True):
     id: int = Field(default=None, primary_key=True)
@@ -54,12 +66,15 @@ class Card(SQLModel, table=True):
 
     @property
     def phone_numbers(self) -> List[str]:
-        """Return the list of phone numbers."""
-        return json.loads(self.phone_numbers_json or "[]")
+        """Convert JSON string to list of phone numbers"""
+        try:
+            return json.loads(self.phone_numbers_json or "[]")
+        except json.JSONDecodeError:
+            return []
 
     @phone_numbers.setter
     def phone_numbers(self, values: List[str]):
-        """Set the phone numbers from a list."""
+        """Convert list of phone numbers to JSON string"""
         self.phone_numbers_json = json.dumps(values)
 
     @property

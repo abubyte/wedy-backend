@@ -1,9 +1,9 @@
 from typing import List, Optional
-from sqlmodel import Session, select
+from sqlmodel import Session, asc, desc, or_, select
 from sqlalchemy import func
-from fastapi import HTTPException, status, UploadFile
+from fastapi import HTTPException, Query, status, UploadFile
 from app.models import Card, Category, User
-from app.models.card_model import CardRegion
+from app.models.card_model import CardRegion, SortField, SortOrder
 from app.schemas.card_schema import CardCreate, CardUpdate
 from app.core.image_service import ImageService
 
@@ -113,16 +113,22 @@ class CardCRUD:
                     detail="Phone numbers must be strings starting with '+'"
                 )
 
-    async def create_card(self, card_data: CardCreate, images: List[UploadFile]) -> Card:
+    async def create_card(self, card_data: CardCreate, images: List[UploadFile], user_id: int) -> Card:
         # Validate all fields
         self._validate_category_id(card_data.category_id)
-        self._validate_user_id(card_data.user_id)
+        self._validate_user_id(user_id)
         self._validate_price(card_data.price, card_data.discount_price)
         self._validate_location(card_data.location_lat, card_data.location_long)
         self._validate_phone_numbers(card_data.phone_numbers)
 
         # Create card instance
-        card = Card(**card_data.model_dump())
+        card_data_dict = card_data.model_dump()
+        card_data_dict["user_id"] = user_id
+        card = Card(**card_data_dict)
+        
+        # Explicitly set phone numbers to ensure they are saved
+        if card_data.phone_numbers:
+            card.phone_numbers = card_data.phone_numbers
         
         # Handle images if provided
         if images:
@@ -165,8 +171,9 @@ class CardCRUD:
         self.session.refresh(card)
         return card
 
-    def get_total_cards(
+    async def get_total_cards(
         self,
+        search: Optional[str] = None,
         min_price: Optional[float] = None,
         max_price: Optional[float] = None,
         location: Optional[CardRegion] = None,
@@ -188,19 +195,31 @@ class CardCRUD:
             query = query.where(Card.rating >= min_rating)
         if is_featured is not None:
             query = query.where(Card.is_featured == is_featured)
-
+            
+        if search:
+            search_term = f"%{search}%"
+            query = query.where(
+                or_(
+                    Card.name.ilike(search_term),
+                    Card.description.ilike(search_term)
+                )
+            )
+            
         return self.session.exec(query).one()
 
-    def get_cards(
+    async def get_cards(
         self,
         skip: int = 0,
         limit: int = 10,
+        search: Optional[str] = None,
         min_price: Optional[float] = None,
         max_price: Optional[float] = None,
         location: Optional[CardRegion] = None,
         category_id: Optional[int] = None,
         min_rating: Optional[float] = None,
-        is_featured: Optional[bool] = None
+        is_featured: Optional[bool] = None,
+        sort_by: Optional[SortField] = None,
+        sort_order: Optional[SortOrder] = None,
     ) -> List[Card]:
         query = select(Card)
 
@@ -216,6 +235,19 @@ class CardCRUD:
             query = query.where(Card.rating >= min_rating)
         if is_featured is not None:
             query = query.where(Card.is_featured == is_featured)
+            
+        if search:
+            search_term = f"%{search}%"
+            query = query.where(
+                or_(
+                    Card.name.ilike(search_term),
+                    Card.description.ilike(search_term)
+                )
+            )
+            
+        sort_column = getattr(Card, sort_by.value)
+        query = query.order_by(desc(sort_column) if sort_order == SortOrder.desc else asc(sort_column))
+
 
         return self.session.exec(
             query
@@ -223,55 +255,36 @@ class CardCRUD:
             .limit(limit)
         ).all()
 
-    def get_card_by_id(self, card_id: int) -> Card:
+    async def get_card_by_id(self, card_id: int) -> Card:
         return self._validate_card_id(card_id)
 
-    async def update_card(self, card_id: int, update_data: CardUpdate, images: List[UploadFile]) -> Card:
+    async def update_card(self, card_id: int, update_data: CardUpdate, images: List[UploadFile], user_id: int) -> Card:
         card = self._validate_card_id(card_id)
-        update_data_dict = update_data.model_dump(exclude_unset=True)
         
         # Validate updated fields
-        if "category_id" in update_data_dict:
-            self._validate_category_id(update_data_dict["category_id"])
+        if "category_id" in update_data.model_dump(exclude_unset=True):
+            self._validate_category_id(update_data.category_id)
         
-        if "user_id" in update_data_dict:
-            self._validate_user_id(update_data_dict["user_id"])
+        if "user_id" in update_data.model_dump(exclude_unset=True):
+            self._validate_user_id(update_data.user_id)
         
-        if "price" in update_data_dict or "discount_price" in update_data_dict:
+        if "price" in update_data.model_dump(exclude_unset=True) or "discount_price" in update_data.model_dump(exclude_unset=True):
             self._validate_price(
-                update_data_dict.get("price", card.price),
-                update_data_dict.get("discount_price", card.discount_price)
+                update_data.price if update_data.price is not None else card.price,
+                update_data.discount_price if update_data.discount_price is not None else card.discount_price
             )
         
-        if "location_lat" in update_data_dict or "location_long" in update_data_dict:
+        if "location_lat" in update_data.model_dump(exclude_unset=True) or "location_long" in update_data.model_dump(exclude_unset=True):
             self._validate_location(
-                update_data_dict.get("location_lat", card.location_lat),
-                update_data_dict.get("location_long", card.location_long)
+                update_data.location_lat if update_data.location_lat is not None else card.location_lat,
+                update_data.location_long if update_data.location_long is not None else card.location_long
             )
         
-        if "phone_numbers" in update_data_dict:
-            self._validate_phone_numbers(update_data_dict["phone_numbers"])
+        if "phone_numbers" in update_data.model_dump(exclude_unset=True):
+            self._validate_phone_numbers(update_data.phone_numbers)
 
-        # Validate images if provided
-        if images:
-            if not isinstance(images, list):
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Images must be a list"
-                )
-            
-            for image in images:
-                if not isinstance(image, UploadFile):
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail="Invalid image file"
-                    )
-                if not image.content_type or not image.content_type.startswith('image/'):
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail="File must be an image"
-                    )
-
+        # Update card fields
+        update_data_dict = update_data.model_dump(exclude_unset=True)
         for key, value in update_data_dict.items():
             if key == "phone_numbers" and value is not None:
                 card.phone_numbers = value
@@ -280,7 +293,14 @@ class CardCRUD:
             else:
                 setattr(card, key, value)
 
+        # Handle images if provided
         if images:
+            if not isinstance(images, list):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Images must be a list"
+                )
+            
             valid_images = []
             for image in images:
                 if (image and 
@@ -299,11 +319,11 @@ class CardCRUD:
                 # Save new images
                 image_paths = []
                 for image in valid_images:
-                    image_path = image_service.get_image_url(
-                        await image_service.save_image(image, "cards")
-                    )
+                    image_path = await image_service.save_image(image, "cards")
                     if image_path:
-                        image_paths.append(image_path)
+                        image_path = image_service.get_image_url(image_path)
+                        if image_path:
+                            image_paths.append(image_path)
                 card.image_urls = image_paths
             else:
                 if card.image_urls:

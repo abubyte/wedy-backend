@@ -5,6 +5,7 @@ from datetime import datetime
 from app.models.user_model import UserRole
 from fastapi import Form
 import re
+from app.schemas.tariff_schema import TariffRead
 
 # Phone number validation regex
 PHONE_REGEX = r'^\+998\d{9}$'
@@ -24,11 +25,13 @@ class UserVerifyRequest(BaseModel):
     ):
         return cls(login=login, code=code)
 
-class UserCreate(BaseModel):
-    firstname: Annotated[str, StringConstraints(min_length=2, max_length=50)]
-    lastname: Annotated[str, StringConstraints(min_length=2, max_length=50)]
-    login: Annotated[str, StringConstraints(min_length=3, max_length=50)]
-    password: Annotated[str, StringConstraints(min_length=8)]
+class UserBase(BaseModel):
+    firstname: str
+    lastname: str
+    login: str
+
+class UserCreate(UserBase):
+    password: str
 
     @validator('login')
     def validate_login(cls, v):
@@ -61,33 +64,43 @@ class UserCreate(BaseModel):
             password=password,
         )
 
-class UserRead(BaseModel):
+class UserRead(UserBase):
     id: int
-    firstname: str
-    lastname: str
-    login: str
     role: UserRole
     is_verified: bool
-    image_url: Optional[str]  
+    image_url: Optional[str]
+    is_active: bool
+    last_login: Optional[datetime] = None
     created_at: datetime
-    last_login: Optional[datetime]
+    updated_at: Optional[datetime] = None
+    tariff_id: Optional[int] = None
+    tariff_expires_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
 
 class UserUpdate(BaseModel):
-    firstname: str = Form(...)
-    lastname: str = Form(...)
+    firstname: Optional[str] = None
+    lastname: Optional[str] = None
+    login: Optional[str] = None
+    password: Optional[str] = None
+    image_url: Optional[str] = None
 
     @classmethod
     def as_form(
         cls,
         firstname: str = Form(...),
         lastname: str = Form(...),
+        login: str = Form(...),
+        password: str = Form(...),
+        image_url: str = Form(...),
     ):
         return cls(
             firstname=firstname,
             lastname=lastname,
+            login=login,
+            password=password,
+            image_url=image_url,
         )
 
 class UserResponse(BaseModel):
