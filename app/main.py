@@ -9,7 +9,7 @@ from pydantic import ValidationError
 from app.core.config import settings
 from app.external_services.s3_service import S3Service
 from app.db.session import create_db_and_tables
-from app.core.startup import ensure_admin_exists
+from app.core.startup import ensure_admin_exists, ensure_free_tariff_exists, ensure_users_have_tariff
 from fastapi.openapi.utils import get_openapi
 
 from app.routers.auth_router import router as auth_router
@@ -17,6 +17,7 @@ from app.routers.user_router import router as user_router
 from app.routers.card_router import router as card_router
 from app.routers.category_router import router as category_router
 from app.routers.interaction_router import router as interaction_router
+from app.routers.tariff_router import router as tariff_router
 
 logging.basicConfig(
     filename="app.log",
@@ -38,6 +39,14 @@ async def lifespan(app: FastAPI):
         logger.info("Checking for admin user...")
         await ensure_admin_exists()
         logger.info("Admin user check completed")
+        
+        logger.info("Checking for free tariff...")
+        await ensure_free_tariff_exists()
+        logger.info("Free tariff check completed")
+        
+        logger.info("Checking users without tariff...")
+        await ensure_users_have_tariff()
+        logger.info("User tariff check completed")
     except Exception as e:
         logger.error(f"Error during application startup: {str(e)}")
         logger.error(f"Traceback: {traceback.format_exc()}")
@@ -45,7 +54,22 @@ async def lifespan(app: FastAPI):
     
     yield
 
-app = FastAPI(lifespan=lifespan)
+app = FastAPI(
+    # title=settings.PROJECT_NAME,
+    # version=settings.VERSION,
+    # description=settings.DESCRIPTION,
+    docs_url="/docs",
+    redoc_url="/redoc"
+)
+
+# Configure CORS
+app.add_middleware(
+    CORSMiddleware,
+    # allow_origins=settings.CORS_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Global exception handler
 @app.exception_handler(Exception)
@@ -110,8 +134,7 @@ app.include_router(user_router)
 app.include_router(category_router)
 app.include_router(card_router)
 app.include_router(interaction_router)
-# app.include_router(likes_router)
-# app.include_router(ratings_router)
+app.include_router(tariff_router)
 
 @app.get("/", include_in_schema=False)
 @app.head("/", include_in_schema=False)

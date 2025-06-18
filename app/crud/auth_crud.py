@@ -2,6 +2,7 @@ from sqlmodel import Session, select
 from datetime import datetime, timedelta
 from fastapi import HTTPException, status, UploadFile
 from app.models.user_model import User
+from app.models.tariff_model import Tariff
 from app.core.security import create_access_token, get_password_hash, create_tokens, verify_token
 from app.core.image_service import ImageService
 from app.external_services.email_service import EmailClient
@@ -40,10 +41,37 @@ class AuthCRUD:
                 detail="User with this login already exists"
             )
 
-        # Create new user
+        # Get free tariff
+        free_tariff = self.session.exec(
+            select(Tariff).where(Tariff.price == 0)
+        ).first()
+        
+        if not free_tariff:
+            # Create free tariff if it doesn't exist
+            free_tariff = Tariff(
+                name="Free",
+                description="Basic free tariff with limited features",
+                price=0,
+                duration_days=30,  # 30 days trial
+                is_active=True,
+                search_priority=0,
+                has_website=False,
+                max_social_medias=2,
+                max_description_chars=200,
+                max_phone_numbers=1,
+                max_images=3,
+                created_at=datetime.utcnow()
+            )
+            self.session.add(free_tariff)
+            self.session.commit()
+            self.session.refresh(free_tariff)
+
+        # Create new user with free tariff
         user_dict = user_data.copy()
         user_dict.update({
             "hashed_password": get_password_hash(user_dict.pop("password")),
+            "tariff_id": free_tariff.id,
+            "tariff_expires_at": datetime.utcnow() + timedelta(days=free_tariff.duration_days)
         })
         
         user = User(**user_dict)

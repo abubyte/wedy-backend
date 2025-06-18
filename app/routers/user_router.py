@@ -23,8 +23,8 @@ async def list_users(
     """List all users (admin only)."""
     try:
         crud = UserCRUD(session)
-        total = await crud.get_total_users()
-        users = await crud.get_users(skip, limit)
+        total = crud.get_total_users()
+        users = crud.get_users(skip, limit)
         
         return UserListResponse(
             total=total,
@@ -56,7 +56,7 @@ async def get_user(
     """Get a user by ID (self or admin)."""
     try:
         crud = UserCRUD(session)
-        user = await crud.get_user_by_id(user_id)
+        user = crud.get_user_by_id(user_id)
         
         if current_user.id != user_id and current_user.role != UserRole.admin:
             raise HTTPException(
@@ -127,8 +127,8 @@ async def update_user_role(
     """Update a user's role (admin only)."""
     try:
         crud = UserCRUD(session)
-        user = await crud.get_user_by_id(user_id)
-        updated_user = await crud.update_user_role(user, role_data.role)
+        user = crud.get_user_by_id(user_id)
+        updated_user = crud.update_user_role(user, role_data.role)
         
         return UserResponse(
             message="User role updated successfully",
@@ -140,4 +140,29 @@ async def update_user_role(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error updating user role: {str(e)}"
+        )
+
+@router.patch("/{user_id}/tariff/{tariff_id}", response_model=UserResponse)
+async def update_user_tariff(
+    user_id: int,
+    tariff_id: int,
+    current_user: User = Depends(get_admin_user),
+    session: Session = Depends(get_session)
+):
+    """Update a user's tariff (admin only)."""
+    try:
+        crud = UserCRUD(session)
+        user = crud.get_user_by_id(user_id)
+        updated_user = crud.update_user_tariff(user, tariff_id)
+        
+        return UserResponse(
+            message="User tariff updated successfully",
+            user=updated_user
+        )
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error updating user tariff: {str(e)}"
         )

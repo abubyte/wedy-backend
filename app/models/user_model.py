@@ -3,6 +3,7 @@ from typing import Optional
 from datetime import datetime
 from enum import Enum
 from passlib.context import CryptContext
+from app.models.tariff_model import Tariff
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -12,19 +13,21 @@ class UserRole(str, Enum):
 
 class User(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    firstname: str
-    lastname: str
-    login: str = Field(index=True, unique=True)
+    firstname: str = Field(max_length=50)
+    lastname: str = Field(max_length=50)
+    login: str = Field(unique=True, index=True)
     hashed_password: str
-    image_url: Optional[str] = Field(default=None, nullable=True)
+    image_url: Optional[str] = None
     role: UserRole = Field(default=UserRole.client)
     is_verified: bool = Field(default=False)
     is_active: bool = Field(default=True)
-    verification_code: Optional[str] = Field(default=None, nullable=True)
-    verification_code_expires: Optional[datetime] = Field(default=None, nullable=True)
-    last_login: Optional[datetime] = Field(default=None, nullable=True)
+    verification_code: Optional[str] = None
+    verification_code_expires: Optional[datetime] = None
+    last_login: Optional[datetime] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: Optional[datetime] = None
+    tariff_id: Optional[int] = Field(default=None, foreign_key="tariff.id")
+    tariff_expires_at: Optional[datetime] = None
 
     def verify_password(self, plain_password: str) -> bool:
         return pwd_context.verify(plain_password, self.hashed_password)

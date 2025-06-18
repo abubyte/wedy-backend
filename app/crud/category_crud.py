@@ -74,14 +74,9 @@ class CategoryCRUD:
                     detail="Category description must be less than 500 characters"
                 )
 
-    def _validate_image(self, image: UploadFile | None) -> None:
+    def _validate_image(self, image: UploadFile) -> None:
         """Validate category image."""
         if image is not None:
-            if not isinstance(image, UploadFile):
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Invalid image file"
-                )
             
             if not image.content_type or not image.content_type.startswith('image/'):
                 raise HTTPException(
@@ -96,7 +91,7 @@ class CategoryCRUD:
                     detail="Image size must be less than 5MB"
                 )
 
-    async def create_category(self, category_data: dict, image: UploadFile | None = None) -> Category:
+    async def create_category(self, category_data: dict, image: UploadFile) -> Category:
         # Validate input data
         if "name" not in category_data:
             raise HTTPException(
@@ -126,7 +121,7 @@ class CategoryCRUD:
     def get_category_by_id(self, category_id: int) -> Category:
         return self._validate_category_id(category_id)
 
-    async def update_category(self, category_id: int, update_data: dict, image: UploadFile | None = None) -> Category:
+    async def update_category(self, category_id: int, update_data: dict, image: UploadFile) -> Category:
         category = self._validate_category_id(category_id)
         
         # Validate update data

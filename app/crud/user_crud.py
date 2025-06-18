@@ -1,8 +1,11 @@
+from fastapi.params import Depends
 from sqlmodel import Session, select
 from sqlalchemy import func
-from datetime import datetime
+from datetime import datetime, timedelta
 from fastapi import HTTPException, status, UploadFile
+from app.db.session import get_session
 from app.models.user_model import User, UserRole
+from app.models.tariff_model import Tariff
 from app.core.image_service import ImageService
 import re
 
@@ -56,12 +59,17 @@ class UserCRUD:
                 detail="Phone number must be a string"
             )
         
-        # Uzbek phone number format: +998XXXXXXXXX
-        phone_pattern = r'^\+998[0-9]{9}$'
-        if not re.match(phone_pattern, phone):
+        if not phone.strip():
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid phone number format. Must be in format: +998XXXXXXXXX"
+                detail="Phone number cannot be empty"
+            )
+        
+        # Uzbek phone number format: +998XXXXXXXXX
+        if not re.match(r'^\+998\d{9}$', phone):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid phone number format. Must be +998XXXXXXXXX"
             )
 
     def _validate_password(self, password: str) -> None:
@@ -78,19 +86,19 @@ class UserCRUD:
                 detail="Password must be at least 8 characters long"
             )
         
-        if not any(c.isupper() for c in password):
+        if not re.search(r'[A-Z]', password):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Password must contain at least one uppercase letter"
             )
         
-        if not any(c.islower() for c in password):
+        if not re.search(r'[a-z]', password):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Password must contain at least one lowercase letter"
             )
         
-        if not any(c.isdigit() for c in password):
+        if not re.search(r'\d', password):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Password must contain at least one number"
@@ -110,6 +118,23 @@ class UserCRUD:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Invalid role. Must be one of: {', '.join(r.value for r in UserRole)}"
+            )
+
+    def _validate_tariff(self, tariff_id: int) -> None:
+        """Validate user tariff."""
+        tariff = self.session.exec(select(Tariff).where(Tariff.id == tariff_id)).first()
+
+        try:
+            if not tariff:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Tariff with id: {tariff_id} does not exists"
+                )
+        
+        except:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Tariff with id: {tariff_id} does not exists"
             )
 
     def _validate_image(self, image: UploadFile | None) -> None:
@@ -176,7 +201,6 @@ class UserCRUD:
             elif key == "password":
                 self._validate_password(value)
         
-        # Update basic fields
         for key, value in update_data.items():
             setattr(user, key, value)
         
@@ -213,3 +237,26 @@ class UserCRUD:
         self.session.commit()
         self.session.refresh(user)
         return user 
+    
+    def update_user_tariff(self, user: User, tariff_id: int) -> User:
+        self._validate_tariff(tariff_id=tariff_id)
+        
+        # Get the tariff to access its duration
+        tariff = self.session.get(Tariff, tariff_id)
+        if not tariff:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Tariff with ID {tariff_id} not found"
+            )
+            
+        # Calculate expiry date based on tariff duration
+        expiry_date = datetime.utcnow() + timedelta(days=tariff.duration_days)
+        
+        user.tariff_id = tariff_id
+        user.tariff_expires_at = expiry_date
+        user.updated_at = datetime.utcnow()
+        
+        self.session.add(user)
+        self.session.commit()
+        self.session.refresh(user)
+        return user
