@@ -6,6 +6,7 @@ from app.models import Card, Category, User
 from app.models.card_model import CardRegion, SortField, SortOrder
 from app.schemas.card_schema import CardCreate, CardUpdate
 from app.core.image_service import ImageService
+import logging
 
 image_service = ImageService()
 
@@ -121,6 +122,10 @@ class CardCRUD:
         self._validate_location(card_data.location_lat, card_data.location_long)
         self._validate_phone_numbers(card_data.phone_numbers)
 
+        # Debug logging for social media
+        logger = logging.getLogger(__name__)
+        logger.info(f"Creating card with social_media: {card_data.social_media}")
+
         # Create card instance
         card_data_dict = card_data.model_dump()
         card_data_dict["user_id"] = user_id
@@ -129,6 +134,12 @@ class CardCRUD:
         # Explicitly set phone numbers to ensure they are saved
         if card_data.phone_numbers:
             card.phone_numbers = card_data.phone_numbers
+        
+        # Explicitly set social media to ensure it is saved
+        if card_data.social_media is not None:
+            card.social_media = card_data.social_media
+            logger.info(f"Set card.social_media to: {card.social_media}")
+            logger.info(f"card.social_media_json is now: {card.social_media_json}")
         
         # Handle images if provided
         if images:
@@ -169,6 +180,11 @@ class CardCRUD:
         self.session.add(card)
         self.session.commit()
         self.session.refresh(card)
+        
+        # Debug logging after save
+        logger.info(f"Card saved with social_media_json: {card.social_media_json}")
+        logger.info(f"Card.social_media property returns: {card.social_media}")
+        
         return card
 
     async def get_total_cards(
@@ -261,6 +277,10 @@ class CardCRUD:
     async def update_card(self, card_id: int, update_data: CardUpdate, images: List[UploadFile], user_id: int) -> Card:
         card = self._validate_card_id(card_id)
         
+        # Debug logging for social media
+        logger = logging.getLogger(__name__)
+        logger.info(f"Updating card {card_id} with social_media: {update_data.social_media}")
+        
         # Validate updated fields
         if "category_id" in update_data.model_dump(exclude_unset=True):
             self._validate_category_id(update_data.category_id)
@@ -290,6 +310,8 @@ class CardCRUD:
                 card.phone_numbers = value
             elif key == "social_media" and value is not None:
                 card.social_media = value
+                logger.info(f"Set card.social_media to: {card.social_media}")
+                logger.info(f"card.social_media_json is now: {card.social_media_json}")
             else:
                 setattr(card, key, value)
 
@@ -334,6 +356,11 @@ class CardCRUD:
         self.session.add(card)
         self.session.commit()
         self.session.refresh(card)
+        
+        # Debug logging after save
+        logger.info(f"Card updated with social_media_json: {card.social_media_json}")
+        logger.info(f"Card.social_media property returns: {card.social_media}")
+        
         return card
 
     async def delete_card(self, card_id: int) -> None:
