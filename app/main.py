@@ -18,6 +18,7 @@ from app.routers.card_router import router as card_router
 from app.routers.category_router import router as category_router
 from app.routers.interaction_router import router as interaction_router
 from app.routers.tariff_router import router as tariff_router
+from app.routers.payme_router import router as payme_router
 
 logging.basicConfig(
     filename="app.log",
@@ -135,6 +136,7 @@ app.include_router(category_router)
 app.include_router(card_router)
 app.include_router(interaction_router)
 app.include_router(tariff_router)
+app.include_router(payme_router)
 
 @app.get("/", include_in_schema=False)
 @app.head("/", include_in_schema=False)

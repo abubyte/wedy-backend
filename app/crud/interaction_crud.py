@@ -4,7 +4,7 @@ from typing import List, Optional
 from datetime import datetime, timedelta
 from fastapi import HTTPException, status
 
-from app.models.interaction_models import Review, Like, View
+from app.models.interaction_model import Review, Like, View
 from app.models.card_model import Card
 from app.models.user_model import User
 from app.schemas.interaction_schemas import ReviewResponse

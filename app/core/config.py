@@ -39,6 +39,15 @@ class Settings(BaseSettings):
     S3_BUCKET_NAME: str
     S3_ENDPOINT_URL: Optional[str] = None
 
+    # Payme Payment Gateway
+    PAYME_MERCHANT_ID: str
+    PAYME_SECRET_KEY: str
+    PAYME_TEST_MODE: bool = True
+    PAYME_CALLBACK_URL: str = "https://api.wedy.uz/payme/webhook"
+    PAYME_API_URL: str = "https://checkout.paycom.uz"
+    PAYME_TEST_API_URL: str = "https://test.paycom.uz"
+    
+
     # Admin Configuration
     DEFAULT_ADMIN_EMAIL: str
     DEFAULT_ADMIN_PASSWORD: str
@@ -56,3 +65,4 @@ class Settings(BaseSettings):
         env_file = ".env"
 
 settings = Settings()
+print(f"Loaded PAYME_SECRET_KEY: {settings.PAYME_SECRET_KEY}")
