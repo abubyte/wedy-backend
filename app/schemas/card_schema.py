@@ -57,6 +57,41 @@ class CardCreate(SQLModel):
         if phone_numbers and phone_numbers.strip():
             parsed_phone_numbers = [phone.strip() for phone in phone_numbers.split(',') if phone.strip()]
         
+        # Parse social media with better error handling
+        parsed_social_media = {}
+        if social_media and social_media.strip():
+            try:
+                # Handle common cases where quotes might be missing
+                social_media_clean = social_media.strip()
+                if social_media_clean.startswith('{') and social_media_clean.endswith('}'):
+                    parsed_social_media = json.loads(social_media_clean)
+                else:
+                    # If it's not valid JSON, try to parse as key-value pairs
+                    # Example: "instagram:https://instagram.com/me,telegram:https://t.me/me"
+                    if ':' in social_media_clean:
+                        pairs = social_media_clean.split(',')
+                        for pair in pairs:
+                            if ':' in pair:
+                                key, value = pair.split(':', 1)
+                                parsed_social_media[key.strip()] = value.strip()
+            except json.JSONDecodeError as e:
+                # Log the error for debugging
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(f"Failed to parse social_media JSON: {social_media}. Error: {e}")
+                # Try to parse as simple key-value pairs
+                if ':' in social_media:
+                    pairs = social_media.split(',')
+                    for pair in pairs:
+                        if ':' in pair:
+                            key, value = pair.split(':', 1)
+                            parsed_social_media[key.strip()] = value.strip()
+        
+        # Debug logging
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"Social media input: '{social_media}' -> parsed: {parsed_social_media}")
+        
         return cls(
             name=name,
             description=description,
@@ -66,7 +101,7 @@ class CardCreate(SQLModel):
             location_lat=location_lat,
             location_long=location_long,
             region=region,
-            social_media=json.loads(social_media or "{}"),
+            social_media=parsed_social_media,
             phone_numbers=parsed_phone_numbers,
         )
 
@@ -133,7 +168,7 @@ class CardUpdate(SQLModel):
     location_lat: Optional[float] = None
     location_long: Optional[float] = None
     region: Optional[CardRegion] = None
-    social_media: Optional[str] = None
+    social_media: Optional[dict] = None
     phone_numbers: Optional[List[str]] = None
 
     class Config:
@@ -152,13 +187,48 @@ class CardUpdate(SQLModel):
         social_media: Optional[str] = Form(None),
         phone_numbers: Optional[str] = Form(None),
     ):
-        parsed_social_media = json.loads(social_media) if social_media else None
-        
         # Parse phone numbers from comma-separated string to list
         parsed_phone_numbers = None
-        if phone_numbers and phone_numbers.strip():
+        if phone_numbers is not None and phone_numbers.strip():
             parsed_phone_numbers = [phone.strip() for phone in phone_numbers.split(',') if phone.strip()]
-
+        
+        # Parse social media with better error handling
+        parsed_social_media = None
+        if social_media is not None and social_media.strip():
+            try:
+                # Handle common cases where quotes might be missing
+                social_media_clean = social_media.strip()
+                if social_media_clean.startswith('{') and social_media_clean.endswith('}'):
+                    parsed_social_media = json.loads(social_media_clean)
+                else:
+                    # If it's not valid JSON, try to parse as key-value pairs
+                    # Example: "instagram:https://instagram.com/me,telegram:https://t.me/me"
+                    if ':' in social_media_clean:
+                        pairs = social_media_clean.split(',')
+                        parsed_social_media = {}
+                        for pair in pairs:
+                            if ':' in pair:
+                                key, value = pair.split(':', 1)
+                                parsed_social_media[key.strip()] = value.strip()
+            except json.JSONDecodeError as e:
+                # Log the error for debugging
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(f"Failed to parse social_media JSON: {social_media}. Error: {e}")
+                # Try to parse as simple key-value pairs
+                if ':' in social_media:
+                    pairs = social_media.split(',')
+                    parsed_social_media = {}
+                    for pair in pairs:
+                        if ':' in pair:
+                            key, value = pair.split(':', 1)
+                            parsed_social_media[key.strip()] = value.strip()
+        
+        # Debug logging
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"CardUpdate - Social media input: '{social_media}' -> parsed: {parsed_social_media}")
+        
         return cls(
             name=name,
             description=description,

@@ -107,4 +107,12 @@ class TariffListResponse(BaseModel):
     total: int
     tariffs: List[TariffRead]
     page: int
-    size: int 
+    size: int
+
+class TariffPurchaseResponse(BaseModel):
+    success: bool
+    message: str
+    tariff: TariffRead
+    payment_url: Optional[str] = None
+    transaction_id: Optional[str] = None
+    error: Optional[str] = None 
