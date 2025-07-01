@@ -72,12 +72,7 @@ class ImageService:
                 with Image.open(temp_path) as img:
                     logger.info(f"Image opened successfully. Mode: {img.mode}, Size: {img.size}")
                     
-                    # Convert to RGB
-                    if img.mode in ('RGBA', 'P'):
-                        logger.info(f"Converting image from {img.mode} to RGB")
-                        img = img.convert('RGB')
-                    
-                    # Resize
+                    # Resize if needed
                     if max(img.size) > self.max_dimension:
                         logger.info(f"Resizing image from {img.size}")
                         ratio = self.max_dimension / max(img.size)
@@ -85,9 +80,21 @@ class ImageService:
                         img = img.resize(new_size, Image.Resampling.LANCZOS)
                         logger.info(f"Resized image to {new_size}")
                     
-                    # Save image
-                    logger.info("Saving processed image")
-                    img.save(temp_path, quality=85, optimize=True)
+                    # Save image with correct format and mode
+                    if ext in ['.jpg', '.jpeg', '.webp']:
+                        if img.mode in ('RGBA', 'P'):
+                            logger.info(f"Converting image from {img.mode} to RGB for JPEG/WEBP")
+                            img = img.convert('RGB')
+                        save_format = 'JPEG' if ext in ['.jpg', '.jpeg'] else 'WEBP'
+                        img.save(temp_path, format=save_format, quality=85, optimize=True)
+                    elif ext == '.png':
+                        if img.mode not in ('RGBA', 'LA'):
+                            logger.info(f"Converting image from {img.mode} to RGBA for PNG")
+                            img = img.convert('RGBA')
+                        img.save(temp_path, format='PNG', optimize=True)
+                    else:
+                        # Default fallback
+                        img.save(temp_path, quality=85, optimize=True)
                     logger.info("Image saved successfully")
             except Exception as e:
                 logger.error(f"Error processing image with PIL: {str(e)}")

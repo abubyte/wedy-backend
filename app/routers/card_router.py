@@ -59,11 +59,13 @@ async def list_cards(
     min_rating: Optional[float] = Query(None, description="Minimum rating for filtering"),
     is_featured: Optional[bool] = Query(None, description="Filter by featured status"),
     sort_by: Optional[SortField] = Query(SortField.created_at, description="Sort by field"),
-    sort_order: Optional[SortOrder] = Query(SortOrder.desc, description="Sort order")
+    sort_order: Optional[SortOrder] = Query(SortOrder.desc, description="Sort order"),
+    my_cards: Optional[bool] = Query(False, description="Show only my cards")
 ):
     """List all cards with optional filters and pagination (all users)."""
     try:
         crud = CardCRUD(session)
+        user_id = current_user.id if my_cards else None
         total = await crud.get_total_cards(
             search=search,
             min_price=min_price,
@@ -72,6 +74,7 @@ async def list_cards(
             category_id=category_id,
             min_rating=min_rating,
             is_featured=is_featured,
+            user_id=user_id
         )
         cards = await crud.get_cards(
             search=search,
@@ -84,8 +87,8 @@ async def list_cards(
             min_rating=min_rating,
             is_featured=is_featured,
             sort_by=sort_by,
-            sort_order=sort_order
-
+            sort_order=sort_order,
+            user_id=user_id
         )
         return CardListResponse(
             total=total,
