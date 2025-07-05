@@ -10,8 +10,10 @@ import app.models
 logger = logging.getLogger(__name__)
 
 logger.info("Creating database engine...")
+# Convert postgresql:// to postgresql+psycopg:// for psycopg v3
+database_url = settings.DATABASE_URL.replace("postgresql://", "postgresql+psycopg://")
 engine = create_engine(
-    settings.DATABASE_URL,
+    database_url,
     echo=True,
     poolclass=QueuePool,
     pool_size=5,
