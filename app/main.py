@@ -60,7 +60,8 @@ app = FastAPI(
     # version=settings.VERSION,
     # description=settings.DESCRIPTION,
     docs_url="/docs",
-    redoc_url="/redoc"
+    redoc_url="/redoc",
+    lifespan=lifespan
 )
 
 # Configure CORS
