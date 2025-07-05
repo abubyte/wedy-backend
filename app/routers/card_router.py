@@ -48,7 +48,6 @@ async def create_card(
 @router.get("", response_model=CardListResponse)
 async def list_cards(
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
     skip: int = Query(0, ge=0, description="Number of records to skip"),
     limit: int = Query(10, ge=1, le=100, description="Number of records to return"),
     search: Optional[str] = Query(None, description="Search in fields"),
@@ -59,11 +58,14 @@ async def list_cards(
     min_rating: Optional[float] = Query(None, description="Minimum rating for filtering"),
     is_featured: Optional[bool] = Query(None, description="Filter by featured status"),
     sort_by: Optional[SortField] = Query(SortField.created_at, description="Sort by field"),
-    sort_order: Optional[SortOrder] = Query(SortOrder.desc, description="Sort order")
+    sort_order: Optional[SortOrder] = Query(SortOrder.desc, description="Sort order"),
+    user_id: Optional[int] = Query(None, description="Show only user cards"),
+    # current_user: Optional[User] = Depends(get_current_user)
 ):
-    """List all cards with optional filters and pagination (all users)."""
+    """List all cards with optional filters and pagination (public)."""
     try:
         crud = CardCRUD(session)
+        # user_id = current_user.id if (my_cards and current_user) else None
         total = await crud.get_total_cards(
             search=search,
             min_price=min_price,
@@ -72,6 +74,7 @@ async def list_cards(
             category_id=category_id,
             min_rating=min_rating,
             is_featured=is_featured,
+            user_id=user_id
         )
         cards = await crud.get_cards(
             search=search,
@@ -84,8 +87,8 @@ async def list_cards(
             min_rating=min_rating,
             is_featured=is_featured,
             sort_by=sort_by,
-            sort_order=sort_order
-
+            sort_order=sort_order,
+            user_id=user_id
         )
         return CardListResponse(
             total=total,
@@ -104,10 +107,9 @@ async def list_cards(
 @router.get("/{card_id}", response_model=CardRead)
 async def get_card(
     card_id: int,
-    session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    session: Session = Depends(get_session)
 ):
-    """Get a card by ID (all users)."""
+    """Get a card by ID (public)."""
     try:
         crud = CardCRUD(session)
         card = await crud.get_card_by_id(card_id)

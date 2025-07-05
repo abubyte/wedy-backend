@@ -1,5 +1,5 @@
 from fastapi.params import Depends
-from sqlmodel import Session, select
+from sqlmodel import Session, select, delete
 from sqlalchemy import func
 from datetime import datetime, timedelta
 from fastapi import HTTPException, status, UploadFile
@@ -52,24 +52,27 @@ class UserCRUD:
             )
 
     def _validate_phone(self, phone: str) -> None:
-        """Validate phone number format."""
+        """Validate phone number or email format."""
         if not isinstance(phone, str):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Phone number must be a string"
+                detail="Phone number or email must be a string"
             )
         
         if not phone.strip():
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Phone number cannot be empty"
+                detail="Phone number or email cannot be empty"
             )
         
         # Uzbek phone number format: +998XXXXXXXXX
-        if not re.match(r'^\+998\d{9}$', phone):
+        phone_pattern = r'^\+998\d{9}$'
+        # Simple email pattern
+        email_pattern = r'^[\w\.-]+@[\w\.-]+\.\w{2,}$'
+        if not (re.match(phone_pattern, phone) or re.match(email_pattern, phone)):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid phone number format. Must be +998XXXXXXXXX"
+                detail="Invalid login format. Must be +998XXXXXXXXX or a valid email address."
             )
 
     def _validate_password(self, password: str) -> None:
@@ -140,17 +143,13 @@ class UserCRUD:
     def _validate_image(self, image: UploadFile | None) -> None:
         """Validate profile image."""
         if image is not None:
-            if not isinstance(image, UploadFile):
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Invalid image file"
-                )
+          
             
-            if not image.content_type or not image.content_type.startswith('image/'):
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="File must be an image"
-                )
+            # if not image.content_type or not image.content_type.startswith('image/'):
+            #     raise HTTPException(
+            #         status_code=status.HTTP_400_BAD_REQUEST,
+            #         detail="File must be an image"
+            #     )
             
             # Check file size (max 5MB)
             if image.size and image.size > 5 * 1024 * 1024:
@@ -194,12 +193,6 @@ class UserCRUD:
                 self._validate_name(value, "First name")
             elif key == "lastname":
                 self._validate_name(value, "Last name")
-            elif key == "login":
-                self._validate_phone(value)
-            elif key == "role":
-                self._validate_role(value)
-            elif key == "password":
-                self._validate_password(value)
         
         for key, value in update_data.items():
             setattr(user, key, value)
@@ -225,7 +218,12 @@ class UserCRUD:
         # Delete profile image if exists
         if user.image_url:
             await image_service.delete_image(user.image_url)
-        
+        # Delete related reviews, likes, and views
+        from app.models.interaction_model import Review, Like, View
+        self.session.exec(delete(Review).where(Review.user_id == user.id))
+        self.session.exec(delete(Like).where(Like.user_id == user.id))
+        self.session.exec(delete(View).where(View.user_id == user.id))
+        self.session.commit()
         self.session.delete(user)
         self.session.commit()
 

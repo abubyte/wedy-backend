@@ -27,6 +27,9 @@ async def register_user(
             message="User registered successfully. Please verify your account.",
             user=user
         )
+    except HTTPException as e:
+        # Re-raise HTTPException to preserve the correct status code
+        raise e
     except Exception as e:
         logger.error(f"Error registering user: {str(e)}")
         raise HTTPException(
@@ -96,6 +99,9 @@ async def reset_password(
         crud = AuthCRUD(session)
         await crud.reset_password(reset_data.login, reset_data.new_password, reset_data.verification_code)
         return {"message": "Password reset successfully"}
+    except HTTPException as e:
+        # Re-raise HTTPException to preserve the correct status code
+        raise e
     except Exception as e:
         logger.error(f"Error resetting password: {str(e)}")
         raise HTTPException(

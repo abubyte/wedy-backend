@@ -72,14 +72,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Global exception handler
-@app.exception_handler(Exception)
+@app.exception_handler
 async def global_exception_handler(request: Request, exc: Exception):
     logger.error(f"Unhandled error: {str(exc)}")
     logger.error(f"Traceback: {traceback.format_exc()}")
+
+    # Try to get a status code and message from the exception if available
+    status_code = getattr(exc, "status_code", 500)
+    message = getattr(exc, "message", None) or str(exc) or "Internal server error"
+
     return JSONResponse(
-        status_code=500,
-        content={"detail": "Internal Server Error"}
+        status_code=status_code,
+        content={"detail": message}
     )
 
 @app.exception_handler(RequestValidationError)

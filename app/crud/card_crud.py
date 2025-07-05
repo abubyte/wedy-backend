@@ -1,11 +1,12 @@
 from typing import List, Optional
 from sqlmodel import Session, asc, desc, or_, select
-from sqlalchemy import func
+from sqlalchemy import func, delete
 from fastapi import HTTPException, Query, status, UploadFile
 from app.models import Card, Category, User
 from app.models.card_model import CardRegion, SortField, SortOrder
 from app.schemas.card_schema import CardCreate, CardUpdate
 from app.core.image_service import ImageService
+from app.models.interaction_model import Review, Like, View
 import logging
 
 image_service = ImageService()
@@ -195,7 +196,8 @@ class CardCRUD:
         location: Optional[CardRegion] = None,
         category_id: Optional[int] = None,
         min_rating: Optional[float] = None,
-        is_featured: Optional[bool] = None
+        is_featured: Optional[bool] = None,
+        user_id: Optional[int] = None
     ) -> int:
         query = select(func.count()).select_from(Card)
 
@@ -211,7 +213,9 @@ class CardCRUD:
             query = query.where(Card.rating >= min_rating)
         if is_featured is not None:
             query = query.where(Card.is_featured == is_featured)
-            
+        if user_id is not None:
+            query = query.where(Card.user_id == user_id)
+        
         if search:
             search_term = f"%{search}%"
             query = query.where(
@@ -220,7 +224,7 @@ class CardCRUD:
                     Card.description.ilike(search_term)
                 )
             )
-            
+        
         return self.session.exec(query).one()
 
     async def get_cards(
@@ -236,6 +240,7 @@ class CardCRUD:
         is_featured: Optional[bool] = None,
         sort_by: Optional[SortField] = None,
         sort_order: Optional[SortOrder] = None,
+        user_id: Optional[int] = None
     ) -> List[Card]:
         query = select(Card)
 
@@ -251,7 +256,9 @@ class CardCRUD:
             query = query.where(Card.rating >= min_rating)
         if is_featured is not None:
             query = query.where(Card.is_featured == is_featured)
-            
+        if user_id is not None:
+            query = query.where(Card.user_id == user_id)
+        
         if search:
             search_term = f"%{search}%"
             query = query.where(
@@ -260,10 +267,9 @@ class CardCRUD:
                     Card.description.ilike(search_term)
                 )
             )
-            
+        
         sort_column = getattr(Card, sort_by.value)
         query = query.order_by(desc(sort_column) if sort_order == SortOrder.desc else asc(sort_column))
-
 
         return self.session.exec(
             query
@@ -365,6 +371,12 @@ class CardCRUD:
 
     async def delete_card(self, card_id: int) -> None:
         card = self._validate_card_id(card_id)
+        # Delete related reviews, likes, and views
+        self.session.exec(delete(Review).where(Review.card_id == card_id))
+        self.session.exec(delete(Like).where(Like.card_id == card_id))
+        self.session.exec(delete(View).where(View.card_id == card_id))
+        self.session.commit()
+        # Delete images if any
         if card.image_urls:
             for url in card.image_urls:
                 await image_service.delete_image(url)

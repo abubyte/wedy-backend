@@ -14,7 +14,7 @@ from sqlmodel import SQLModel
 config = context.config
 
 # set db url
-database_url = settings.DATABASE_URL
+database_url = settings.DATABASE_URL.replace("postgresql://", "postgresql+psycopg://")
 config.set_main_option("sqlalchemy.url", database_url)
 
 # Interpret the config file for Python logging.

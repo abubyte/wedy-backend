@@ -24,10 +24,9 @@ async def create_category(
 
 @router.get("", response_model=List[CategoryRead])
 async def list_categories(
-    session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    session: Session = Depends(get_session)
 ):
-    """List all categories (all users)."""
+    """List all categories (public)."""
     crud = CategoryCRUD(session)
     categories = crud.get_categories()
     return categories
@@ -35,10 +34,9 @@ async def list_categories(
 @router.get("/{category_id}", response_model=CategoryRead)
 async def get_category(
     category_id: int,
-    session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    session: Session = Depends(get_session)
 ):
-    """Get a category by ID (all users)."""
+    """Get a category by ID (public)."""
     crud = CategoryCRUD(session)
     category = crud.get_category_by_id(category_id)
     return category

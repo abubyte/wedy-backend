@@ -82,25 +82,16 @@ class UserRead(UserBase):
 class UserUpdate(BaseModel):
     firstname: Optional[str] = None
     lastname: Optional[str] = None
-    login: Optional[str] = None
-    password: Optional[str] = None
-    image_url: Optional[str] = None
 
     @classmethod
     def as_form(
         cls,
-        firstname: str = Form(...),
-        lastname: str = Form(...),
-        login: str = Form(...),
-        password: str = Form(...),
-        image_url: str = Form(...),
+        firstname: str = Form(None),
+        lastname: str = Form(None),
     ):
         return cls(
             firstname=firstname,
             lastname=lastname,
-            login=login,
-            password=password,
-            image_url=image_url,
         )
 
 class UserResponse(BaseModel):
