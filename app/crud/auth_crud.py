@@ -105,12 +105,32 @@ class AuthCRUD:
 
         # Send verification code
         logger.info(f"Verification code for user {user.id}: {verification_code}")
-        if re.match(r"^\+998\d{9}$", login):
-            EskizClient().send_sms(phone=login.removeprefix("+"), message=f'Wedy mobil ilovasi uchun tasdiqlash kodi: {verification_code}')
-        elif re.match(r"^[^@]+@[^@]+\.[^@]+$", login):
-            subject = "Tasdiqlash kodi"
-            body = f"Wedy uchun tasdiqlash kodi: {verification_code}"
-            EmailClient().send_email(login, subject, body)
+        try:
+            if re.match(r"^\+998\d{9}$", login):
+                logger.info(f"Sending SMS verification code to {login}")
+                EskizClient().send_sms(phone=login.removeprefix("+"), message=f'Wedy mobil ilovasi uchun tasdiqlash kodi: {verification_code}')
+                logger.info(f"SMS verification code sent successfully to {login}")
+            elif re.match(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$", login):
+                logger.info(f"Sending email verification code to {login}")
+                subject = "Tasdiqlash kodi"
+                body = f"Wedy uchun tasdiqlash kodi: {verification_code}"
+                EmailClient().send_email(login, subject, body)
+                logger.info(f"Email verification code sent successfully to {login}")
+            else:
+                logger.error(f"Invalid login format: {login}")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid login format. Please use a valid phone number (+998XXXXXXXXX) or email address."
+                )
+        except HTTPException:
+            # Re-raise HTTPExceptions to preserve status codes
+            raise
+        except Exception as e:
+            logger.error(f"Failed to send verification code to {login}: {str(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to send verification code. Please try again later."
+            )
 
     async def verify_user(self, login: str, code: str) -> None:
         user = self.get_user_by_login(login)
