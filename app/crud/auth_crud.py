@@ -114,7 +114,13 @@ class AuthCRUD:
                 logger.info(f"Sending email verification code to {login}")
                 subject = "Tasdiqlash kodi"
                 body = f"Wedy uchun tasdiqlash kodi: {verification_code}"
-                EmailClient().send_email(login, subject, body)
+                email_sent = EmailClient().send_email(login, subject, body)
+                if not email_sent:
+                    logger.error(f"Failed to send email verification code to {login}")
+                    raise HTTPException(
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail="Failed to send verification email. Please try again later."
+                    )
                 logger.info(f"Email verification code sent successfully to {login}")
             else:
                 logger.error(f"Invalid login format: {login}")
